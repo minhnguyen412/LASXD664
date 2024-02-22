@@ -1,0 +1,196 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import pandas as pd
+import os
+import shutil
+from openpyxl import load_workbook
+import xlwings as xw
+from PIL import ImageTk, Image
+
+data_columns = ['Date', 'Las Number', 'Drill Hole Name', 'Sample Name', 'Depth', 'Group', 'Description', 'Special Index', 'SPT']
+data_rows = []
+
+fixed_values = {
+    'Date': '',
+    'Drill Hole Name': ''
+}
+
+def add_data(event=None):
+    fixed_values['Date'] = entry_vars['Date'].get()
+    fixed_values['Drill Hole Name'] = entry_vars['Drill Hole Name'].get()
+    
+    if not fixed_values['Date'] or not fixed_values['Drill Hole Name']:
+        messagebox.showwarning("Warning", "Please enter values for 'Date' and 'Drill Hole Name'.")
+        return
+    
+    row = [fixed_values['Date'], '', fixed_values['Drill Hole Name']]
+    row[1] = entry_vars['Las Number'].get()  # Assign Las Number value
+    for column in data_columns[3:]:
+        entry = entry_vars[column].get()
+        row.append(entry)
+        entry_vars[column].set('')  # Clear the entry after adding data
+    data_rows.append(row)
+    update_data_table()
+
+def update_data_table():
+    data_frame = pd.DataFrame(data_rows, columns=data_columns)
+    data_table.config(state=tk.NORMAL)
+    data_table.delete('1.0', tk.END)
+    data_table.insert(tk.END, data_frame.to_string(index=False))
+    data_table.config(state=tk.DISABLED)
+
+def export_data():
+    data_frame = pd.DataFrame(data_rows, columns=data_columns)
+    file_path = filedialog.asksaveasfilename(defaultextension='.xlsx', filetypes=[('Excel Files', '*.xlsx')])
+    if file_path:
+        try:
+            data_frame.to_excel(file_path, index=False)
+            messagebox.showinfo("Notification", "Data exported successfully to an Excel file.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error exporting data: {str(e)}")
+
+def import_data():
+    file_path = filedialog.askopenfilename(filetypes=[('Excel Files', '*.xlsx')])
+    if file_path:
+        try:
+            data_frame = pd.read_excel(file_path)
+            data_frame = data_frame.fillna('')  # Replace NaN values with empty string
+            data_rows.extend(data_frame.values.tolist())
+            update_data_table()
+            messagebox.showinfo("Notification", "Data imported successfully.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error importing data: {str(e)}")
+
+def clear_data():
+    global data_rows
+    data_rows = []
+    update_data_table()
+
+def copy_and_rename_files():
+    selected_files = listbox.curselection()
+    if not selected_files:
+        messagebox.showwarning("Warning", "Please select at least one Excel file.")
+        return
+    
+    success_message = ""  # Variable to store the success message
+    
+    for index in selected_files:
+        file_path = listbox.get(index)
+        file_name = os.path.basename(file_path)
+        
+        match_count = get_match_count(file_name)
+        if match_count == 0:
+            continue
+        
+        for row in data_rows:
+            group = row[data_columns.index('Group')]
+            if group.lower() in file_name.lower():
+                new_file_name = generate_new_file_name(row)
+                destination_file = os.path.join(os.path.dirname(file_path), new_file_name)
+                
+                try:
+                    shutil.copy(file_path, destination_file)
+                    success_message += f"Copied and renamed file {file_name} successfully.\n"  # Concatenate success message
+                    # Open the new Excel file using openpyxl
+                    excel_app = xw.App(visible=False)
+                    wb = excel_app.books.open(destination_file)
+                    sheet = wb.sheets.active
+                    sheet.range('K7').value = row[data_columns.index('Date')]
+                    sheet.range('N7').value = row[data_columns.index('Las Number')]
+                    sheet.range('C7').value = row[data_columns.index('Drill Hole Name')]
+                    sheet.range('C8').value = row[data_columns.index('Sample Name')]
+                    sheet.range('F8').value = row[data_columns.index('Depth')]
+                    sheet.range('Q5').value = row[data_columns.index('Description')]
+                    sheet.range('Q6').value = row[data_columns.index('SPT')]
+                    wb.save()
+                    wb.close()
+                    excel_app.quit()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Error copying and renaming file {file_name}: {str(e)}")
+    
+    if success_message:
+        messagebox.showinfo("Notification", success_message)  # Show success message if not empty
+
+def get_match_count(file_name):
+    count = 0
+    
+    for row in data_rows:
+        group = row[data_columns.index('Group')]
+        if group.lower() in file_name.lower():
+            count += 1
+    
+    return count
+
+def normalize_string(text):
+    return text.lower().replace(' ', '')
+
+def generate_new_file_name(row):
+    number = row[data_columns.index('Las Number')]
+    borehole_name = row[data_columns.index('Drill Hole Name')]
+    sample_name = row[data_columns.index('Sample Name')]
+    special_indicator =row[data_columns.index('Special Index')]
+    
+    if special_indicator:
+        new_file_name = f"{number} - {borehole_name} - {sample_name} - {special_indicator}.xlsx"
+    else:
+        new_file_name = f"{number} - {borehole_name} - {sample_name}.xlsx"
+    
+    return new_file_name
+
+def browse_files():
+    files = filedialog.askopenfilenames(filetypes=[('Excel Files', '*.xlsx')])
+    for file in files:
+        listbox.insert(tk.END, file)
+
+window = tk.Tk()
+window.title("DMFC-LASXD664")
+
+# Create labels and entry fields for each data column
+entry_vars = {}
+for i, column in enumerate(data_columns):
+    label = tk.Label(window, text=column)
+    label.grid(row=0, column=i, padx=5, pady=5)
+    entry_var = tk.StringVar()
+    entry = tk.Entry(window, textvariable=entry_var)
+    entry.grid(row=1, column=i, padx=5)
+    entry.bind('<Return>', add_data)  # Bind Enter key to add_data function
+    entry_vars[column] = entry_var
+
+# Create a table to display the data
+data_table = tk.Text(window, height=10, width=150, state=tk.DISABLED)
+data_table.grid(row=2, column=0, columnspan=len(data_columns), padx=5, pady=5)
+
+# Create a listbox to display the selected files
+listbox = tk.Listbox(window, height=5, width=80, selectmode=tk.MULTIPLE)
+listbox.grid(row=4, column=0, columnspan=len(data_columns), padx=5, pady=5)
+
+# Tạo một Frame để chứa các nút
+button_frame = tk.Frame(window)
+button_frame.grid(row=3, column=0, columnspan=len(data_columns), padx=5, pady=5)
+
+# Tạo các nút trong button_frame
+export_button = tk.Button(button_frame, text="Export Data", command=export_data)
+export_button.grid(row=0, column=0, padx=5, pady=5)
+
+import_button = tk.Button(button_frame, text="Import Data", command=import_data)
+import_button.grid(row=0, column=1, padx=5, pady=5)
+
+browse_button = tk.Button(button_frame, text="Browse Files", command=browse_files)
+browse_button.grid(row=0, column=3, padx=5, pady=5)
+
+clear_button = tk.Button(button_frame, text="Clear Data", command=clear_data)
+clear_button.grid(row=0, column=2, padx=5, pady=5)
+
+# Tạo một Frame để chứa nút "Copy and Rename"
+copy_button_frame = tk.Frame(window)
+copy_button_frame.grid(row=5, column=0, columnspan=len(data_columns), padx=5, pady=5)
+
+# Tạo nút "Copy and Rename" trong copy_button_frame
+copy_button = tk.Button(copy_button_frame, text="Copy and Rename Files", command=copy_and_rename_files)
+copy_button.pack(padx=5, pady=5)
+
+# Thêm logo và chữ vào cuối giao diện
+signature_label = tk.Label(window, text="By XM GEO - email: xmgeo2022@gmail.com")
+signature_label.grid(row=7, column=0, columnspan=len(data_columns), padx=5, pady=5)
+
+window.mainloop()
