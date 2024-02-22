@@ -1,0 +1,51 @@
+Sub CopyDataFromWorkbooks1()
+    Dim MyPath As String, FilesInPath As String
+    Dim MyFiles() As String
+    Dim SourceRng As Range
+    Dim DestRng As Range
+    Dim i As Integer, j As Integer
+    Dim LastRow As Long
+    
+    'Change the path to the folder that contains the workbooks you want to copy from
+    MyPath = "D:\filemau"
+    i = 0
+    If Right(MyPath, 1) <> "\" Then MyPath = MyPath & "\"
+    'Get the list of files in the folder
+    FilesInPath = Dir(MyPath & "*.xlsx")
+    
+    'Loop through each file in the folder
+    Do While FilesInPath <> ""
+        
+        'Add the file name to the array
+        ReDim Preserve MyFiles(i)
+        MyFiles(i) = FilesInPath
+        
+        'Move to the next file in the folder
+        FilesInPath = Dir
+        
+        'Increment the counter
+        i = i + 1
+        
+    Loop
+    
+    'Loop through each file in the array
+    For j = 0 To UBound(MyFiles)
+        
+        'Open the workbook
+        Workbooks.Open MyPath & MyFiles(j)
+        
+        'Copy the data from the worksheet
+        Set SourceRng = ActiveWorkbook.Worksheets("LAB 664").Range("A64:AZ64")
+        
+        
+        'Paste the data into the next row of the master workbook
+        Set DestRng = Workbooks("copyexcel.xlsm").Worksheets("Sheet1").Range("A" & j + 1 & ":AZ" & j + 1)
+        SourceRng.Copy
+        DestRng.PasteSpecial Paste:=xlPasteValues
+        
+        'Close the workbook
+        ActiveWorkbook.Close SaveChanges:=False
+        
+    Next j
+    
+End Sub
