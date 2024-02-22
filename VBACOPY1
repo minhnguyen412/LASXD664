@@ -1,0 +1,99 @@
+Sub CopyAndPastesheet1()
+
+    Dim sourcePath As String
+    Dim targetFolder As String
+    Dim sourceWorkbook As Workbook
+    Dim targetWorkbook As Workbook
+    Dim sourceSheet As Worksheet
+    Dim targetSheet As Worksheet
+    Dim sourceRange1 As Range
+    Dim sourceRange2 As Range
+    Dim sourceRange3 As Range
+    Dim sourceRange4 As Range
+    Dim targetRange1 As Range
+    Dim targetRange2 As Range
+    Dim targetRange3 As Range
+    Dim targetRange4 As Range
+    Dim file As String
+    
+    ' Duong dan den file nguon
+    ' Hop thoai chen duong dan den file nguon
+    With Application.FileDialog(msoFileDialogFilePicker)
+        .Title = "Chon File nguon"
+        .Filters.Clear
+        .Filters.Add "Excel Files", "*.xlsx; *.xlsm; *.xls"
+        .AllowMultiSelect = False
+        If .Show = -1 Then
+            sourcePath = .SelectedItems(1)
+        Else
+            Exit Sub
+        End If
+    End With
+    
+    ' Thu muc chua cac file dich
+    ' Hop thoai thu muc chua cac file dich
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Chon thu muc dich"
+        .AllowMultiSelect = False
+        If .Show = -1 Then
+            targetFolder = .SelectedItems(1)
+        Else
+            Exit Sub
+        End If
+    End With
+    
+    ' file nguon
+    Set sourceWorkbook = ThisWorkbook
+    
+    ' Dat vi tri ban dau cho nguon copy
+    Set sourceSheet = sourceWorkbook.Worksheets("DT-KLR-Hco-emax,min")
+    Set sourceRange1 = sourceSheet.Range("Q3:R3")
+    Set sourceRange2 = sourceSheet.Range("Q4:R4")
+    Set sourceRange3 = sourceSheet.Range("Q5:R5")
+    Set sourceRange4 = sourceSheet.Range("Q6")
+
+    ' Lap qua cac file trong thu muc dich
+    file = Dir(targetFolder & "\*.xlsx")
+    Do While file <> ""
+        ' Mo file dich
+        Set targetWorkbook = Workbooks.Open(targetFolder & "\" & file)
+        
+        ' Dat vi tri paste co dinh
+        Set targetSheet = targetWorkbook.Worksheets("DT-KLR-Hco-emax,min")
+        Set targetRange1 = targetSheet.Range("M14:N14")
+        Set targetRange2 = targetSheet.Range("F15:G15")
+        Set targetRange3 = targetSheet.Range("F18:G18")
+        Set targetRange4 = targetSheet.Range("M26")
+        ' Copy va paste gia tri
+        On Error Resume Next
+        sourceRange1.Copy
+        targetRange1.PasteSpecial Paste:=xlPasteValues
+        
+        sourceRange2.Copy
+        targetRange2.PasteSpecial Paste:=xlPasteValues
+        
+        sourceRange3.Copy
+        targetRange3.PasteSpecial Paste:=xlPasteValues
+        
+        sourceRange4.Copy
+        targetRange4.PasteSpecial Paste:=xlPasteValues
+        
+        ' Ðóng clipboard
+        Application.CutCopyMode = False
+        
+        ' Ðóng file dích
+        targetWorkbook.Close SaveChanges:=True
+        
+        ' Dich chuyen vung copy sang file 2 cot
+        Set sourceRange1 = sourceRange1.Offset(0, 2)
+        Set sourceRange2 = sourceRange2.Offset(0, 2)
+        Set sourceRange3 = sourceRange3.Offset(0, 2)
+        Set sourceRange4 = sourceRange4.Offset(0, 2)
+        
+        ' Tiep tuc voi file tiep theo
+        file = Dir
+    Loop
+    
+    
+    
+End Sub
