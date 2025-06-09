@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# === Bước 1: Đọc dữ liệu từ Excel ===
+file_path = r"C:\Users\Asus\OneDrive\Máy tính\a hai\wb1.xlsx"
+sheet_name = 'Sheet1'
+cols = 'A:L'
+
+df = pd.read_excel(file_path, sheet_name=sheet_name, usecols=cols, header=None, skiprows=0, nrows=2)
+
+P = df.iloc[0].values.astype(float)
+e = df.iloc[1].values.astype(float)
+
+# === Bước 2: Fit đường parabol trên log(P) (bỏ P=0 vì log(0) undefined) ===
+fit_mask = (P > 0) & (~np.isnan(P)) & (~np.isnan(e))
+logP_fit = np.log10(P[fit_mask])
+e_fit = e[fit_mask]
+
+coeffs = np.polyfit(logP_fit, e_fit, 2)
+
+def parabolic(logP):
+    return coeffs[0]*logP**2 + coeffs[1]*logP + coeffs[2]
+
+# === Bước 3: Dịch đường cong để đi qua điểm e0 tại P=0 ===
+e0 = e[0]
+logP_min = np.min(logP_fit)
+logP_virtual_zero = logP_min - 1  # logP nhỏ hơn điểm nhỏ nhất để giả lập P→0
+e_virtual = parabolic(logP_virtual_zero)
+delta = e0 - e_virtual
+
+def shifted_parabolic(logP):
+    return parabolic(logP) + delta
+
+# === Bước 4: Tính lại toàn bộ e_new (kể cả các điểm đã có), dựa trên đường đã dịch ===
+logP_all = np.full_like(P, np.nan, dtype=float)
+logP_all[P > 0] = np.log10(P[P > 0])
+e_new = np.full_like(e, np.nan, dtype=float)
+
+for i in range(len(P)):
+    if P[i] == 0:
+        e_new[i] = e0  # điểm gốc ban đầu
+    elif not np.isnan(logP_all[i]):
+        e_new[i] = shifted_parabolic(logP_all[i])
+
+# === Bước 5: In kết quả (giữ lại thông tin điểm gốc hay nội suy) ===
+for i, (p_i, e_orig, e_calc) in enumerate(zip(P, e, e_new)):
+    status = 'gốc' if not np.isnan(e_orig) else 'nội suy'
+    print(f"P = {p_i:.1f} kPa, e = {e_calc:.4f} ({status})")
+
+# === Bước 6: Vẽ biểu đồ ===
+plt.figure(figsize=(8, 5))
+plt.scatter(logP_fit, e_fit, color='blue', label='Dữ liệu gốc (P > 0)')
+plt.plot(logP_all[P > 0], e_new[P > 0], 'r-', label='Trendline đã dịch (qua e₀)')
+plt.scatter(-1, e0, color='green', label='e₀ tại P = 0', zorder=5)
+
+plt.xlabel('log(P)')
+plt.ylabel('e')
+plt.title('Đường cong nén e - log(P) dịch về e₀')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
